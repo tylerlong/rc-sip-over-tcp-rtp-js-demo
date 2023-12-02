@@ -8,6 +8,7 @@
     "test": "tsx -r dotenv-override-true/config src/index.ts"
   },
   "devDependencies": {
+    "@rc-ex/core": "^1.3.4",
     "@types/node": "^20.10.2",
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",

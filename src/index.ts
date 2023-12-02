@@ -4,7 +4,7 @@ import net from 'net';
 import { v4 as uuid } from 'uuid';
 
 import type { OutboundMessage } from './sip-message';
-import { InboundMessage, RequestMessage } from './sip-message';
+import { InboundMessage, RequestMessage, ResponseMessage } from './sip-message';
 import { generateAuthorization } from './utils';
 
 const sipInfo: SipInfoResponse = {
@@ -73,3 +73,33 @@ const onConnected = async () => {
   send(newMessage);
 };
 emitter.once('connected', onConnected);
+
+emitter.on('message', (inboundMessage: InboundMessage) => {
+  if (!inboundMessage.subject.startsWith('INVITE sip:')) {
+    return;
+  }
+  // Construct the SDP answer
+  const answerSDP = `
+v=0
+o=- 1645658372 0 IN IP4 127.0.0.1
+s=sipsorcery
+c=IN IP4 127.0.0.1
+t=0 0
+m=audio 65106 RTP/AVP 0 101
+a=rtpmap:0 PCMU/8000
+a=rtpmap:101 telephone-event/8000
+a=fmtp:101 0-16
+a=sendrecv
+a=ssrc:322229412 cname:fd410cd4-b177-47ad-ad5b-f52f93be65c1
+`.trim();
+  const newMessage = new ResponseMessage(
+    inboundMessage,
+    200,
+    {
+      Contact: `<sip:${fakeEmail};transport=ws>`,
+      'Content-Type': 'application/sdp',
+    },
+    answerSDP,
+  );
+  send(newMessage);
+});

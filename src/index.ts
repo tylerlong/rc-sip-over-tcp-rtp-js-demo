@@ -2,10 +2,18 @@ import type SipInfoResponse from '@rc-ex/core/lib/definitions/SipInfoResponse';
 import EventEmitter from 'events';
 import net from 'net';
 import { v4 as uuid } from 'uuid';
+import dgram from 'dgram';
+import stun from 'stun';
 
 import type { OutboundMessage } from './sip-message';
 import { InboundMessage, RequestMessage, ResponseMessage } from './sip-message';
 import { generateAuthorization } from './utils';
+
+const main = async () => {
+  const res = await stun.request('stun.l.google.com:19302');
+  console.log(res.getXorAddress()); // { port: 58440, family: 'IPv4', address: '23.93.165.149' }
+};
+main();
 
 const sipInfo: SipInfoResponse = {
   domain: process.env.SIP_INFO_DOMAIN,
@@ -74,24 +82,39 @@ const onConnected = async () => {
 };
 emitter.once('connected', onConnected);
 
-emitter.on('message', (inboundMessage: InboundMessage) => {
+emitter.on('message', async (inboundMessage: InboundMessage) => {
   if (!inboundMessage.subject.startsWith('INVITE sip:')) {
     return;
   }
+  const RTP_PORT = 65106;
+  const socket = dgram.createSocket('udp4');
+  socket.on('listening', () => {
+    const address = socket.address();
+    console.log(`RTP listener is listening on ${address.address}:${address.port}`);
+  });
+  socket.on('message', () => {
+    console.log('received UDP message');
+  });
+  socket.bind(RTP_PORT);
+
+  const res = await stun.request('stun.l.google.com:19302');
+  const { address, port } = res.getXorAddress(); // { port: 58440, family: 'IPv4', address: '23.93.165.149' }
+
   // Construct the SDP answer
-  const answerSDP = `
+  const answerSDP =
+    `
 v=0
-o=- 1645658372 0 IN IP4 127.0.0.1
+o=- 1645658372 0 IN IP4 ${address}
 s=sipsorcery
-c=IN IP4 127.0.0.1
+c=IN IP4 ${address}
 t=0 0
-m=audio 65106 RTP/AVP 0 101
+m=audio ${RTP_PORT} RTP/AVP 0 101
 a=rtpmap:0 PCMU/8000
 a=rtpmap:101 telephone-event/8000
 a=fmtp:101 0-16
 a=sendrecv
 a=ssrc:322229412 cname:fd410cd4-b177-47ad-ad5b-f52f93be65c1
-`.trim();
+`.trim() + '\r\n';
   const newMessage = new ResponseMessage(
     inboundMessage,
     200,

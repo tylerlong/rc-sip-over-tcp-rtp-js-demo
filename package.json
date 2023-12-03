@@ -25,6 +25,7 @@
     "yarn-upgrade-all": "^0.7.2"
   },
   "dependencies": {
+    "stun": "^2.1.0",
     "uuid": "^9.0.1"
   }
 }

@@ -4,17 +4,11 @@ import net from 'net';
 import { v4 as uuid } from 'uuid';
 import dgram from 'dgram';
 import fs from 'fs';
-// import stun from 'stun';
+import { RtpPacket } from 'werift';
 
 import type { OutboundMessage } from './sip-message';
 import { InboundMessage, RequestMessage, ResponseMessage } from './sip-message';
 import { generateAuthorization } from './utils';
-
-// const main = async () => {
-//   const res = await stun.request('stun.l.google.com:19302');
-//   console.log(res.getXorAddress()); // { port: 58440, family: 'IPv4', address: '23.93.165.149' }
-// };
-// main();
 
 const sipInfo: SipInfoResponse = {
   domain: process.env.SIP_INFO_DOMAIN,
@@ -96,15 +90,18 @@ emitter.on('message', async (inboundMessage: InboundMessage) => {
     const address = socket.address();
     console.log(`RTP listener is listening on ${address.address}:${address.port}`);
   });
-  socket.on('message', () => {
-    console.log('received UDP message');
+  if (fs.existsSync('test.raw')) {
+    fs.unlinkSync('test.raw');
+  }
+  const writeStream = fs.createWriteStream('test.raw', { flags: 'a' });
+  socket.on('message', (...args) => {
+    console.log(...args);
+    const rtpPacket = RtpPacket.deSerialize(args[0]);
+    console.log(rtpPacket);
+    writeStream.write(rtpPacket.payload);
   });
   socket.bind(RTP_PORT);
 
-  // const res = await stun.request('stun.l.google.com:19302');
-  // const { address, port } = res.getXorAddress(); // { port: 58440, family: 'IPv4', address: '23.93.165.149' }
-
-  // Construct the SDP answer
   const answerSDP =
     `
 v=0
@@ -130,12 +127,11 @@ a=ssrc:322229412 cname:fd410cd4-b177-47ad-ad5b-f52f93be65c1
   );
   send(newMessage);
 
+  // send a DTMF to remote server so that it knows how to reply
   const remoteIP = inboundMessage.body.match(/c=IN IP4 ([\d.]+)/)![1];
   const remotePort = parseInt(inboundMessage.body.match(/m=audio (\d+) /)![1], 10);
-  const dtmf_data = fs.readFileSync('./rtp_dtmf.bin');
-  // const client = dgram.createSocket('udp4');
+  const dtmf_data = fs.readFileSync('./rtp_dtmf.bin'); // copied from https://github.com/shinyoshiaki/werift-webrtc/tree/develop/packages/rtp/tests/data
   socket.send(new Uint8Array(dtmf_data), remotePort, remoteIP, (...args) => {
     console.log('send dtmf callback', ...args);
-    // client.close();
   });
 });

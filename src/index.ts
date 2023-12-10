@@ -90,13 +90,14 @@ emitter.on('message', async (inboundMessage: InboundMessage) => {
     const address = socket.address();
     console.log(`RTP listener is listening on ${address.address}:${address.port}`);
   });
-  if (fs.existsSync('test.raw')) {
-    fs.unlinkSync('test.raw');
+  const filename = 'test.raw';
+  if (fs.existsSync(filename)) {
+    fs.unlinkSync(filename);
   }
-  const writeStream = fs.createWriteStream('test.raw', { flags: 'a' });
-  socket.on('message', (...args) => {
-    console.log(...args);
-    const rtpPacket = RtpPacket.deSerialize(args[0]);
+  const writeStream = fs.createWriteStream(filename, { flags: 'a' });
+  socket.on('message', (message, rinfo) => {
+    console.log(rinfo);
+    const rtpPacket = RtpPacket.deSerialize(message);
     console.log(rtpPacket);
     writeStream.write(rtpPacket.payload);
   });
